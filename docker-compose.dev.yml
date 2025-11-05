@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: classmate-mongodb-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: classmate
+    volumes:
+      - mongodb_data_dev:/data/db
+    networks:
+      - classmate-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend (NestJS) - Development mode
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: classmate-backend-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017/classmate
+      PORT: 3001
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - classmate-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run start:dev
+
+  # Frontend (Next.js) - Development mode
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: builder
+    container_name: classmate-frontend-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - backend
+    networks:
+      - classmate-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+
+networks:
+  classmate-network:
+    driver: bridge
+
+volumes:
+  mongodb_data_dev:
+    driver: local
