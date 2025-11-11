@@ -9,11 +9,25 @@ export class MonitoriasGrupalesService {
   constructor(@InjectModel(MonitoriaGrupal.name) private model: Model<MonitoriaGrupal>) {}
 
   async create(dto: CreateMonitoriaGrupalDto, monitorId: string) {
-    return new this.model({ ...dto, monitorId }).save();
+    const aforoString = dto.aforoMaximo === undefined || dto.aforoMaximo === null
+      ? 'ilimitado'
+      : dto.aforoMaximo === 'ilimitado'
+        ? 'ilimitado'
+        : String(dto.aforoMaximo);
+    return new this.model({ ...dto, aforoMaximo: aforoString, monitorId }).save();
   }
 
   async listByMonitor(monitorId: string) {
-    return this.model.find({ monitorId }).exec();
+    const docs = await this.model.find({ monitorId }).exec();
+    return docs.map(d => {
+      const obj = d.toObject();
+      let aforo: number | 'ilimitado';
+      if (obj.aforoMaximo === 'ilimitado') aforo = 'ilimitado';
+      else {
+        const parsed = parseInt(obj.aforoMaximo, 10);
+        aforo = isNaN(parsed) ? 'ilimitado' : parsed;
+      }
+      return { ...obj, aforoMaximo: aforo };
+    });
   }
 }
-
