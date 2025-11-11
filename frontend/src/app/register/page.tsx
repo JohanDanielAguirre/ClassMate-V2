@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -14,6 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { api, ApiError } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -23,11 +26,60 @@ export default function RegisterPage() {
     university: '',
     role: '',
   })
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
+  const { login } = useAuth()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implementar lógica de registro
-    console.log('Register:', formData)
+    setError(null)
+    setLoading(true)
+
+    try {
+      const response = await api.register({
+        email: formData.email,
+        name: formData.name,
+        password: formData.password,
+        university: formData.university,
+        role: formData.role as 'Monitor' | 'Estudiante',
+      })
+      
+      // Guardar token
+      localStorage.setItem('token', response.access_token)
+      
+      // Obtener perfil del usuario
+      try {
+        const profile = await api.getProfile()
+        // Crear objeto User desde el perfil completo
+        const user = {
+          id: profile._id || profile.id,
+          email: profile.email,
+          name: profile.name,
+          role: profile.role,
+          university: profile.university || '',
+        }
+        login(user)
+        router.push(profile.role === 'Monitor' ? '/monitor/dashboard' : '/estudiante/dashboard')
+      } catch (profileError) {
+        // Si no se puede obtener el perfil, usar datos del formulario como fallback
+        console.warn('No se pudo obtener el perfil:', profileError)
+        const user = {
+          id: 'temp',
+          email: formData.email,
+          name: formData.name,
+          role: formData.role,
+          university: formData.university,
+        }
+        login(user)
+        router.push(formData.role === 'Monitor' ? '/monitor/dashboard' : '/estudiante/dashboard')
+      }
+    } catch (err) {
+      const apiError = err as ApiError
+      setError(apiError.message || 'Error al registrarse')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleChange = (field: string, value: string) => {
@@ -127,11 +179,17 @@ export default function RegisterPage() {
                 </SelectContent>
               </Select>
             </div>
+            {error && (
+              <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                {error}
+              </div>
+            )}
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground mt-6"
+              disabled={loading}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground mt-6 disabled:opacity-50"
             >
-              Registrarse
+              {loading ? 'Registrando...' : 'Registrarse'}
             </Button>
           </form>
           <div className="mt-6 text-center text-sm">

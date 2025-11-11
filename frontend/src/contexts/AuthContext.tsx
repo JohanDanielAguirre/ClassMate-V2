@@ -8,16 +8,17 @@ interface AuthContextType {
   login: (user: User) => void
   logout: () => void
   isAuthenticated: boolean
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // En el futuro, esto leerá del token del backend
   useEffect(() => {
-    // Por ahora, cargar usuario mock si existe en localStorage
+    // Cargar usuario si existe en localStorage
     const storedUser = localStorage.getItem("user")
     if (storedUser) {
       try {
@@ -26,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Ignorar errores de parseo
       }
     }
+    setIsLoading(false)
   }, [])
 
   const login = (userData: User) => {
@@ -36,6 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     setUser(null)
     localStorage.removeItem("user")
+    localStorage.removeItem("token")
   }
 
   return (
@@ -45,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         isAuthenticated: !!user,
+        isLoading,
       }}
     >
       {children}

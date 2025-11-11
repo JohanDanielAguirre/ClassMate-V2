@@ -23,8 +23,10 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  getProfile(@Req() req: any) {
-    return req.user;
+  async getProfile(@Req() req: any) {
+    const user = await this.usersService.findById(req.user.id);
+    const { passwordHash, ...userWithoutPassword } = user.toObject();
+    return userWithoutPassword;
   }
 }
 

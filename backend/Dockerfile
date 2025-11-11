@@ -1,3 +1,20 @@
+# Development stage
+FROM node:20 AS dev
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm install
+
+# Expose port
+EXPOSE 3001
+
+# Default command for development
+CMD ["npm", "run", "start:dev"]
+
 # Build stage
 FROM node:20 AS builder
 

@@ -4,31 +4,41 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { DashboardLayout } from "@/components/layout/DashboardLayout"
-import { mockUser } from "@/data/mockData"
 
 export default function MonitorLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { user, login, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    // Por ahora, auto-login con usuario mock si no hay usuario
-    // En el futuro, esto verificará el token del backend
-    if (!isAuthenticated) {
-      login(mockUser)
+    // Esperar a que termine de cargar antes de verificar autenticación
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        // Si no está autenticado, redirigir a login
+        router.push("/login")
+      } else if (user?.role !== "Monitor") {
+        // Si está autenticado pero no es Monitor, redirigir a su dashboard correspondiente
+        if (user?.role === "Estudiante") {
+          router.push("/estudiante/dashboard")
+        } else {
+          router.push("/login")
+        }
+      }
     }
-  }, [isAuthenticated, login])
+  }, [isAuthenticated, isLoading, user, router])
 
-  // Si no hay usuario después del efecto, redirigir a login
-  // (esto se activará cuando se implemente la autenticación real)
-  // useEffect(() => {
-  //   if (!isAuthenticated) {
-  //     router.push("/login")
-  //   }
-  // }, [isAuthenticated, router])
+  // Mostrar loading mientras se verifica la autenticación
+  if (isLoading) {
+    return null // o un componente de loading
+  }
+
+  // Si no es Monitor, no renderizar (ya se está redirigiendo)
+  if (user?.role !== "Monitor") {
+    return null
+  }
 
   return <DashboardLayout>{children}</DashboardLayout>
 }
