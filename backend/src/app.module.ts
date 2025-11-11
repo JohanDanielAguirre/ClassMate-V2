@@ -11,9 +11,11 @@ import { MonitoriasConfirmadasModule } from './monitorias-confirmadas/monitorias
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SeedModule } from './dev-seed/seed.module';
 
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/classmate';
+
 @Module({
   imports: [
-    MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://mongodb:27017/classmate'),
+    MongooseModule.forRoot(mongoUri),
     UsersModule,
     AuthModule,
     MonitoriasPersonalizadasModule,
