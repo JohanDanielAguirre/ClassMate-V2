@@ -27,6 +27,8 @@ export interface MonitoriaGrupal {
   }>
   aforoMaximo: number | "ilimitado"
   monitorId: string
+  estudiantesConfirmados?: number
+  interesados?: number
 }
 
 export interface SolicitudMonitoria {
@@ -92,6 +94,8 @@ export interface MonitoriaDisponible {
   espacio?: string
   aforoMaximo?: number | "ilimitado"
   estudiantesConfirmados?: number
+  diasYHorarios?: Array<{ dia: string; hora: string }> // Horario habitual para grupales
+  recurrencia?: "dos-a-la-semana" | "una-a-la-semana" | "una-cada-dos-semanas"
 }
 
 export interface SolicitudMonitoriaEstudiante {

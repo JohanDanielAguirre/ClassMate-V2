@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,12 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  mockDashboardStats,
-  mockSolicitudes,
-  mockMonitoriasConfirmadas,
-} from "@/data/mockData"
-import { SolicitudMonitoria, MonitoriaConfirmada } from "@/types"
+import { SolicitudMonitoria, MonitoriaConfirmada, DashboardStats } from "@/types"
+import { useAuth } from "@/contexts/AuthContext"
+import { api, ApiError } from "@/lib/api"
 import {
   Calendar,
   Clock,
@@ -214,34 +211,125 @@ function HorarioModal({
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth()
   const [selectedSolicitud, setSelectedSolicitud] = useState<SolicitudMonitoria | null>(
     null
   )
   const [selectedMonitoria, setSelectedMonitoria] = useState<MonitoriaConfirmada | null>(
     null
   )
-  const [solicitudes, setSolicitudes] = useState(mockSolicitudes)
-  const stats = mockDashboardStats
+  const [stats, setStats] = useState<DashboardStats>({
+    monitoriasConfirmadasEstaSemana: 0,
+    proximaMonitoria: null,
+    totalMonitoriasDadas: 0,
+    calificacionMedia: 0,
+  })
+  const [solicitudesPendientes, setSolicitudesPendientes] = useState<SolicitudMonitoria[]>([])
+  const [monitoriasHoy, setMonitoriasHoy] = useState<MonitoriaConfirmada[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Filtrar monitorias del día actual
-  const today = new Date().toISOString().split("T")[0]
-  const monitoriasHoy = mockMonitoriasConfirmadas
-    .filter((m) => m.fecha === today)
-    .sort((a, b) => a.horario.localeCompare(b.horario))
-
-  const handleAcceptSolicitud = (id: string) => {
-    setSolicitudes((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, estado: "aceptada" } : s))
-    )
+  // Función para mapear solicitud del backend
+  const mapSolicitudFromBackend = (data: any): SolicitudMonitoria => {
+    return {
+      id: data._id || data.id,
+      fecha: data.fecha,
+      horario: data.horario,
+      curso: data.curso,
+      estudiante: data.estudiante || { id: '', name: 'Desconocido', email: '' },
+      espacio: data.espacio,
+      tipo: data.tipo,
+      estado: data.estado,
+      tieneConflicto: data.tieneConflicto || false,
+      monitoriaGrupalId: data.monitoriaGrupalId,
+    }
   }
 
-  const handleRejectSolicitud = (id: string) => {
-    setSolicitudes((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, estado: "rechazada" } : s))
-    )
+  // Función para mapear monitoría confirmada del backend
+  const mapMonitoriaFromBackend = (data: any): MonitoriaConfirmada => {
+    return {
+      id: data._id || data.id,
+      fecha: data.fecha,
+      horario: data.horario,
+      curso: data.curso,
+      espacio: data.espacio,
+      tipo: data.tipo,
+      estudiantes: data.estudiantes || [],
+      monitoriaPersonalizadaId: data.monitoriaPersonalizadaId,
+      monitoriaGrupalId: data.monitoriaGrupalId,
+    }
   }
 
-  const solicitudesPendientes = solicitudes.filter((s) => s.estado === "pendiente")
+  // Cargar datos del dashboard
+  useEffect(() => {
+    if (user?.id) {
+      loadDashboardData()
+    }
+  }, [user?.id])
+
+  const loadDashboardData = async () => {
+    if (!user?.id) return
+    
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.getMonitorDashboard()
+      
+      // Mapear estadísticas
+      setStats({
+        monitoriasConfirmadasEstaSemana: data.monitoriasConfirmadasEstaSemana || 0,
+        proximaMonitoria: data.proximaMonitoria,
+        totalMonitoriasDadas: data.totalMonitoriasDadas || 0,
+        calificacionMedia: data.calificacionMedia || 0,
+      })
+      
+      // Mapear solicitudes pendientes
+      const solicitudesMapped = (data.solicitudesPendientes || []).map(mapSolicitudFromBackend)
+      setSolicitudesPendientes(solicitudesMapped)
+      
+      // Mapear monitorías de hoy
+      const monitoriasMapped = (data.horarioHoy || []).map(mapMonitoriaFromBackend)
+      setMonitoriasHoy(monitoriasMapped)
+    } catch (err) {
+      const apiError = err as ApiError
+      setError(apiError.message || 'Error al cargar datos del dashboard')
+      console.error('Error loading dashboard:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAcceptSolicitud = async (id: string) => {
+    try {
+      await api.updateSolicitudEstado(id, 'aceptada')
+      // Recargar datos
+      await loadDashboardData()
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al aceptar solicitud')
+      console.error('Error accepting solicitud:', err)
+    }
+  }
+
+  const handleRejectSolicitud = async (id: string) => {
+    try {
+      await api.updateSolicitudEstado(id, 'rechazada')
+      // Recargar datos
+      await loadDashboardData()
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al rechazar solicitud')
+      console.error('Error rejecting solicitud:', err)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground">Cargando dashboard...</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -249,6 +337,14 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Resumen general de tu actividad como monitor</p>
       </div>
+
+      {error && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-red-500">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 4 Cards principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

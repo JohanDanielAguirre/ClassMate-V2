@@ -22,5 +22,14 @@ export class MonitoriasConfirmadasController {
   async listEstudiante(@Param('estudianteId') estudianteId: string) {
     return this.service.listByEstudiante(estudianteId);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('grupal/:monitoriaGrupalId/confirmar')
+  async confirmarAsistenciaGrupal(
+    @Param('monitoriaGrupalId') monitoriaGrupalId: string,
+    @Req() req: any
+  ) {
+    return this.service.confirmarAsistenciaGrupal(monitoriaGrupalId, req.user.id);
+  }
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -25,11 +25,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { MonitoriaCard } from "@/components/student/MonitoriaCard"
 import { MonitorProfileModal } from "@/components/student/MonitorProfileModal"
 import { Pagination } from "@/components/ui/pagination"
-import {
-  mockMonitoriasDisponibles,
-  mockPerfilMonitor,
-} from "@/data/mockData"
-import { MonitoriaDisponible } from "@/types"
+import { MonitoriaDisponible, PerfilMonitor } from "@/types"
+import { api, ApiError } from "@/lib/api"
 import { Search, Calendar, Clock, DollarSign, Users, Star } from "lucide-react"
 
 function MonitoriaDetailModal({
@@ -86,19 +83,27 @@ function MonitoriaDetailModal({
           <div className="grid grid-cols-2 gap-4">
             {monitoria.tipo === "grupal" ? (
               <>
+                {/* Horario habitual */}
+                {monitoria.diasYHorarios && monitoria.diasYHorarios.length > 0 && (
+                  <div className="col-span-2">
+                    <p className="text-sm font-medium text-muted-foreground">Horario Habitual</p>
+                    <div className="space-y-1">
+                      {monitoria.diasYHorarios.map((dh, idx) => (
+                        <p key={idx} className="text-sm">
+                          {dh.dia} a las {dh.hora}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Próxima sesión */}
                 {monitoria.fecha && (
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Fecha</p>
-                    <p className="text-sm">{monitoria.fecha}</p>
+                    <p className="text-sm font-medium text-muted-foreground">Próxima Sesión</p>
+                    <p className="text-sm">{monitoria.fecha} a las {monitoria.horario}</p>
                   </div>
                 )}
-                {monitoria.horario && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Horario</p>
-                    <p className="text-sm">{monitoria.horario}</p>
-                  </div>
-                )}
-                {monitoria.espacio && (
+                {monitoria.espacio && monitoria.espacio !== 'Por definir' && (
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Espacio</p>
                     <p className="text-sm">{monitoria.espacio}</p>
@@ -115,7 +120,7 @@ function MonitoriaDetailModal({
                   </div>
                 )}
                 {monitoria.estudiantesConfirmados !== undefined && (
-                  <div className="col-span-2">
+                  <div>
                     <p className="text-sm font-medium text-muted-foreground">
                       Estudiantes confirmados
                     </p>
@@ -255,12 +260,83 @@ export default function MonitoriasPage() {
   const [selectedMonitoria, setSelectedMonitoria] =
     useState<MonitoriaDisponible | null>(null)
   const [selectedMonitorId, setSelectedMonitorId] = useState<string | null>(null)
+  const [monitorias, setMonitorias] = useState<MonitoriaDisponible[]>([])
+  const [perfilMonitor, setPerfilMonitor] = useState<PerfilMonitor | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const itemsPerPage = 15
 
+  // Función para mapear monitoría grupal del backend
+  const mapGrupalFromBackend = (data: any): MonitoriaDisponible => {
+    return {
+      id: data._id || data.id,
+      curso: data.curso,
+      tipo: "grupal",
+      fecha: data.proximaSesion?.fecha,
+      horario: data.proximaSesion?.horario,
+      espacio: data.proximaSesion?.espacio,
+      aforoMaximo: data.aforoMaximo,
+      estudiantesConfirmados: data.proximaSesion?.estudiantesConfirmados || 0,
+      diasYHorarios: data.diasYHorarios || [], // Horario habitual
+      recurrencia: data.recurrencia,
+      monitor: data.monitor ? {
+        id: data.monitor.id,
+        name: data.monitor.name,
+        calificacion: data.monitor.calificacion || 0,
+      } : { id: data.monitorId, name: "Desconocido", calificacion: 0 },
+      monitoriaGrupalId: data.monitoriaGrupalId || data._id?.toString(),
+    }
+  }
+
+  // Función para mapear monitoría personalizada del backend
+  const mapPersonalizadaFromBackend = (data: any): MonitoriaDisponible => {
+    return {
+      id: data._id || data.id,
+      curso: data.curso,
+      tipo: "personalizada",
+      precioPorHora: data.precioPorHora,
+      descripcion: data.descripcion,
+      monitor: data.monitor ? {
+        id: data.monitor.id,
+        name: data.monitor.name,
+        calificacion: data.monitor.calificacion || 0,
+      } : { id: data.monitorId, name: "Desconocido", calificacion: 0 },
+      monitoriaPersonalizadaId: data.monitoriaPersonalizadaId || data._id?.toString(),
+    }
+  }
+
+  // Cargar monitorías según el tipo
+  useEffect(() => {
+    loadMonitorias()
+  }, [tipoFilter])
+
+  const loadMonitorias = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      let data: any[]
+      if (tipoFilter === "grupal") {
+        data = await api.getMonitoriasGrupalesDisponibles()
+        const mapped = data.map(mapGrupalFromBackend)
+        setMonitorias(mapped)
+      } else {
+        data = await api.getMonitoriasPersonalizadasDisponibles()
+        const mapped = data.map(mapPersonalizadaFromBackend)
+        setMonitorias(mapped)
+      }
+    } catch (err) {
+      const apiError = err as ApiError
+      setError(apiError.message || 'Error al cargar monitorías')
+      console.error('Error loading monitorías:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Filtrar y ordenar monitorias
   const filteredMonitorias = useMemo(() => {
-    let filtered = mockMonitoriasDisponibles.filter((m) => m.tipo === tipoFilter)
+    let filtered = monitorias.filter((m) => m.tipo === tipoFilter)
 
     // Búsqueda
     if (searchQuery) {
@@ -272,20 +348,11 @@ export default function MonitoriasPage() {
       )
     }
 
-    // Ordenamiento
-    if (tipoFilter === "personalizada") {
-      // Por mejor calificados
-      filtered.sort((a, b) => b.monitor.calificacion - a.monitor.calificacion)
-    } else {
-      // Por más próximas (fecha)
-      filtered.sort((a, b) => {
-        if (!a.fecha || !b.fecha) return 0
-        return a.fecha.localeCompare(b.fecha)
-      })
-    }
+    // Ordenamiento alfabético por curso (como se especifica en el plan)
+    filtered.sort((a, b) => a.curso.localeCompare(b.curso))
 
     return filtered
-  }, [searchQuery, tipoFilter])
+  }, [searchQuery, tipoFilter, monitorias])
 
   // Paginación
   const totalPages = Math.ceil(filteredMonitorias.length / itemsPerPage)
@@ -294,20 +361,66 @@ export default function MonitoriasPage() {
     currentPage * itemsPerPage
   )
 
-  const handleConfirm = (id: string) => {
-    // Aquí se confirmaría la asistencia
-    console.log("Confirmar asistencia:", id)
-    setSelectedMonitoria(null)
+  const handleConfirm = async (id: string) => {
+    try {
+      await api.confirmarAsistenciaGrupal(id)
+      alert('Asistencia confirmada exitosamente')
+      setSelectedMonitoria(null)
+      // Recargar monitorías para actualizar contadores
+      await loadMonitorias()
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al confirmar asistencia')
+      console.error('Error confirming asistencia:', err)
+    }
   }
 
-  const handleRequest = (data: { fecha: string; horario: string; cantidadHoras: number }) => {
-    // Aquí se enviaría la solicitud
-    console.log("Enviar solicitud:", data)
+  const handleRequest = async (data: { fecha: string; horario: string; cantidadHoras: number }) => {
+    if (!selectedMonitoria) return
+
+    try {
+      // Obtener el espacio (puede venir de la monitoría o ser un campo por defecto)
+      const espacio = selectedMonitoria.espacio || "Por definir"
+      
+      await api.createSolicitud({
+        fecha: data.fecha,
+        horario: data.horario,
+        curso: selectedMonitoria.curso,
+        espacio: espacio,
+        tipo: "personalizada",
+        monitorId: selectedMonitoria.monitor.id,
+        monitoriaPersonalizadaId: selectedMonitoria.monitoriaPersonalizadaId,
+      })
+      alert('Solicitud enviada exitosamente')
+      setSelectedMonitoria(null)
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al enviar solicitud')
+      console.error('Error sending solicitud:', err)
+    }
   }
 
-  const handleViewProfile = (monitorId: string) => {
-    setSelectedMonitorId(monitorId)
-    setSelectedMonitoria(null)
+  const handleViewProfile = async (monitorId: string) => {
+    try {
+      const profile = await api.getUserProfile(monitorId)
+      // Mapear perfil del backend al formato esperado
+      const perfil: PerfilMonitor = {
+        id: profile._id || profile.id,
+        name: profile.name,
+        email: profile.email,
+        calificacion: profile.calificacionMedia || 0,
+        avatar: profile.avatar,
+        monitoriasGrupales: [], // Se pueden cargar si es necesario
+        monitoriasPersonalizadas: [], // Se pueden cargar si es necesario
+      }
+      setPerfilMonitor(perfil)
+      setSelectedMonitorId(monitorId)
+      setSelectedMonitoria(null)
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al cargar perfil del monitor')
+      console.error('Error loading profile:', err)
+    }
   }
 
   return (
@@ -352,8 +465,21 @@ export default function MonitoriasPage() {
         </Select>
       </div>
 
-      {/* Grid de monitorias */}
-      {paginatedMonitorias.length === 0 ? (
+      {error && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-red-500">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {loading ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <p className="text-muted-foreground">Cargando monitorías...</p>
+          </CardContent>
+        </Card>
+      ) : paginatedMonitorias.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <p className="text-lg font-medium">No se encontraron monitorías</p>
@@ -396,9 +522,12 @@ export default function MonitoriasPage() {
       />
 
       <MonitorProfileModal
-        perfil={selectedMonitorId === "1" ? mockPerfilMonitor : null}
+        perfil={perfilMonitor}
         isOpen={!!selectedMonitorId}
-        onClose={() => setSelectedMonitorId(null)}
+        onClose={() => {
+          setSelectedMonitorId(null)
+          setPerfilMonitor(null)
+        }}
       />
     </div>
   )

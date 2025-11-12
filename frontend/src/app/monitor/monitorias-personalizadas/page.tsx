@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,9 +20,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { mockMonitoriasPersonalizadas } from "@/data/mockData"
 import { MonitoriaPersonalizada } from "@/types"
 import { Plus, MoreVertical, Edit, Trash2, BookOpen } from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
+import { api, ApiError } from "@/lib/api"
 
 function MonitoriaCard({
   monitoria,
@@ -193,10 +194,49 @@ function MonitoriaModal({
 }
 
 export default function MonitoriasPersonalizadasPage() {
-  const [monitorias, setMonitorias] = useState(mockMonitoriasPersonalizadas)
+  const { user } = useAuth()
+  const [monitorias, setMonitorias] = useState<MonitoriaPersonalizada[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMonitoria, setSelectedMonitoria] =
     useState<MonitoriaPersonalizada | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Función para mapear datos del backend al formato del frontend
+  const mapMonitoriaFromBackend = (data: any): MonitoriaPersonalizada => {
+    return {
+      id: data._id || data.id,
+      curso: data.curso,
+      precioPorHora: data.precioPorHora,
+      descripcion: data.descripcion,
+      monitorId: data.monitorId,
+    }
+  }
+
+  // Cargar monitorías al montar
+  useEffect(() => {
+    if (user?.id) {
+      loadMonitorias()
+    }
+  }, [user?.id])
+
+  const loadMonitorias = async () => {
+    if (!user?.id) return
+    
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.getMonitoriasPersonalizadas(user.id)
+      const mapped = data.map(mapMonitoriaFromBackend)
+      setMonitorias(mapped)
+    } catch (err) {
+      const apiError = err as ApiError
+      setError(apiError.message || 'Error al cargar monitorías')
+      console.error('Error loading monitorías:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleAdd = () => {
     setSelectedMonitoria(null)
@@ -208,31 +248,48 @@ export default function MonitoriasPersonalizadasPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("¿Estás seguro de que deseas eliminar esta monitoría?")) {
-      setMonitorias((prev) => prev.filter((m) => m.id !== id))
+  const handleDelete = async (id: string) => {
+    if (!confirm("¿Estás seguro de que deseas eliminar esta monitoría?")) {
+      return
+    }
+
+    try {
+      await api.deleteMonitoriaPersonalizada(id)
+      // Recargar la lista
+      await loadMonitorias()
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al eliminar monitoría')
+      console.error('Error deleting monitoría:', err)
     }
   }
 
-  const handleSave = (data: Omit<MonitoriaPersonalizada, "id" | "monitorId">) => {
-    if (selectedMonitoria) {
-      // Editar
-      setMonitorias((prev) =>
-        prev.map((m) =>
-          m.id === selectedMonitoria.id
-            ? { ...m, ...data }
-            : m
-        )
-      )
-    } else {
-      // Crear nueva
-      const newMonitoria: MonitoriaPersonalizada = {
-        id: Date.now().toString(),
-        ...data,
-        monitorId: "1", // En el futuro vendrá del contexto de auth
+  const handleSave = async (data: Omit<MonitoriaPersonalizada, "id" | "monitorId">) => {
+    try {
+      if (selectedMonitoria) {
+        // Editar
+        await api.updateMonitoriaPersonalizada(selectedMonitoria.id, data)
+      } else {
+        // Crear nueva
+        await api.createMonitoriaPersonalizada(data)
       }
-      setMonitorias((prev) => [...prev, newMonitoria])
+      // Recargar la lista
+      await loadMonitorias()
+      setIsModalOpen(false)
+      setSelectedMonitoria(null)
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al guardar monitoría')
+      console.error('Error saving monitoría:', err)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground">Cargando monitorías...</p>
+      </div>
+    )
   }
 
   return (
@@ -249,6 +306,14 @@ export default function MonitoriasPersonalizadasPage() {
           Añadir Monitoría
         </Button>
       </div>
+
+      {error && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-red-500">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {monitorias.length === 0 ? (
         <Card>

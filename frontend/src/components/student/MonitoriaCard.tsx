@@ -28,11 +28,25 @@ export function MonitoriaCard({ monitoria, onClick }: MonitoriaCardProps) {
         <div className="space-y-2">
           {monitoria.tipo === "grupal" ? (
             <>
+              {/* Horario habitual */}
+              {monitoria.diasYHorarios && monitoria.diasYHorarios.length > 0 && (
+                <div className="flex items-start gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <div className="flex-1">
+                    {monitoria.diasYHorarios.map((dh, idx) => (
+                      <p key={idx} className="text-muted-foreground">
+                        {dh.dia} {dh.hora}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Próxima sesión */}
               {monitoria.fecha && monitoria.horario && (
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>
-                    {monitoria.fecha} a las {monitoria.horario}
+                  <span className="text-muted-foreground">
+                    Próxima: {monitoria.fecha} {monitoria.horario}
                   </span>
                 </div>
               )}

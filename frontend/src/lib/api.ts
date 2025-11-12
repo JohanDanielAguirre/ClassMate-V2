@@ -97,6 +97,149 @@ class ApiClient {
       method: 'GET',
     });
   }
+
+  // Monitorías Personalizadas
+  async getMonitoriasPersonalizadas(monitorId: string): Promise<any[]> {
+    return this.request<any[]>(`/monitorias-personalizadas/monitor/${monitorId}`, {
+      method: 'GET',
+    });
+  }
+
+  async createMonitoriaPersonalizada(data: {
+    curso: string;
+    precioPorHora: number;
+    descripcion: string;
+  }): Promise<any> {
+    return this.request<any>('/monitorias-personalizadas', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMonitoriaPersonalizada(id: string, data: {
+    curso: string;
+    precioPorHora: number;
+    descripcion: string;
+  }): Promise<any> {
+    return this.request<any>(`/monitorias-personalizadas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMonitoriaPersonalizada(id: string): Promise<void> {
+    return this.request<void>(`/monitorias-personalizadas/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Monitorías Grupales
+  async getMonitoriasGrupales(monitorId: string): Promise<any[]> {
+    return this.request<any[]>(`/monitorias-grupales/monitor/${monitorId}`, {
+      method: 'GET',
+    });
+  }
+
+  async createMonitoriaGrupal(data: {
+    curso: string;
+    recurrencia: 'dos-a-la-semana' | 'una-a-la-semana' | 'una-cada-dos-semanas';
+    diasYHorarios: { dia: string; hora: string }[];
+    aforoMaximo?: number | 'ilimitado';
+  }): Promise<any> {
+    return this.request<any>('/monitorias-grupales', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMonitoriaGrupal(id: string, data: {
+    curso: string;
+    recurrencia: 'dos-a-la-semana' | 'una-a-la-semana' | 'una-cada-dos-semanas';
+    diasYHorarios: { dia: string; hora: string }[];
+    aforoMaximo?: number | 'ilimitado';
+  }): Promise<any> {
+    return this.request<any>(`/monitorias-grupales/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMonitoriaGrupal(id: string): Promise<void> {
+    return this.request<void>(`/monitorias-grupales/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Dashboard
+  async getMonitorDashboard(): Promise<any> {
+    return this.request<any>('/dashboard/monitor', {
+      method: 'GET',
+    });
+  }
+
+  // Solicitudes
+  async updateSolicitudEstado(id: string, estado: 'aceptada' | 'rechazada'): Promise<any> {
+    return this.request<any>(`/solicitudes/${id}/estado`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estado }),
+    });
+  }
+
+  async createSolicitud(data: {
+    fecha: string;
+    horario: string;
+    curso: string;
+    espacio: string;
+    tipo: 'personalizada' | 'grupal';
+    monitorId: string;
+    monitoriaGrupalId?: string;
+    monitoriaPersonalizadaId?: string;
+  }): Promise<any> {
+    return this.request<any>('/solicitudes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Monitorías Disponibles
+  async getMonitoriasGrupalesDisponibles(): Promise<any[]> {
+    return this.request<any[]>('/monitorias-grupales/disponibles', {
+      method: 'GET',
+    });
+  }
+
+  async getMonitoriasPersonalizadasDisponibles(): Promise<any[]> {
+    return this.request<any[]>('/monitorias-personalizadas/disponibles', {
+      method: 'GET',
+    });
+  }
+
+  // Confirmar Asistencia
+  async confirmarAsistenciaGrupal(monitoriaGrupalId: string): Promise<any> {
+    return this.request<any>(`/monitorias-confirmadas/grupal/${monitoriaGrupalId}/confirmar`, {
+      method: 'POST',
+    });
+  }
+
+  // Usuarios
+  async getUserProfile(userId: string): Promise<any> {
+    return this.request<any>(`/users/${userId}`, {
+      method: 'GET',
+    });
+  }
+
+  // Dashboard Estudiante
+  async getEstudianteDashboard(): Promise<any> {
+    return this.request<any>('/dashboard/estudiante', {
+      method: 'GET',
+    });
+  }
+
+  async getMonitoriasConfirmadasEstudiante(estudianteId: string): Promise<any[]> {
+    return this.request<any[]>(`/monitorias-confirmadas/estudiante/${estudianteId}`, {
+      method: 'GET',
+    });
+  }
 }
 
 export const api = new ApiClient();

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,9 +27,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { mockMonitoriasGrupales } from "@/data/mockData"
 import { MonitoriaGrupal } from "@/types"
 import { Plus, MoreVertical, Edit, Trash2, Users, Calendar, Clock } from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
+import { api, ApiError } from "@/lib/api"
 
 const diasSemana = [
   "Lunes",
@@ -120,8 +121,12 @@ function MonitoriaGrupalCard({
           </div>
           <div className="rounded-lg border bg-muted/50 p-2">
             <p className="text-xs text-muted-foreground">Asistencia confirmada</p>
-            <p className="text-lg font-semibold">12 estudiantes</p>
-            <p className="text-xs text-muted-foreground">Interesados: 8</p>
+            <p className="text-lg font-semibold">
+              {monitoria.estudiantesConfirmados ?? 0} estudiantes
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Interesados: {monitoria.interesados ?? 0}
+            </p>
           </div>
         </div>
       </CardContent>
@@ -358,9 +363,51 @@ function MonitoriaGrupalModal({
 }
 
 export default function MonitoriasGrupalesPage() {
-  const [monitorias, setMonitorias] = useState(mockMonitoriasGrupales)
+  const { user } = useAuth()
+  const [monitorias, setMonitorias] = useState<MonitoriaGrupal[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMonitoria, setSelectedMonitoria] = useState<MonitoriaGrupal | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Función para mapear datos del backend al formato del frontend
+  const mapMonitoriaFromBackend = (data: any): MonitoriaGrupal => {
+    return {
+      id: data._id || data.id,
+      curso: data.curso,
+      recurrencia: data.recurrencia,
+      diasYHorarios: data.diasYHorarios || [],
+      aforoMaximo: data.aforoMaximo === 'ilimitado' ? 'ilimitado' : (typeof data.aforoMaximo === 'number' ? data.aforoMaximo : parseInt(data.aforoMaximo, 10) || 'ilimitado'),
+      monitorId: data.monitorId,
+      estudiantesConfirmados: data.estudiantesConfirmados ?? 0,
+      interesados: data.interesados ?? 0,
+    }
+  }
+
+  // Cargar monitorías al montar
+  useEffect(() => {
+    if (user?.id) {
+      loadMonitorias()
+    }
+  }, [user?.id])
+
+  const loadMonitorias = async () => {
+    if (!user?.id) return
+    
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.getMonitoriasGrupales(user.id)
+      const mapped = data.map(mapMonitoriaFromBackend)
+      setMonitorias(mapped)
+    } catch (err) {
+      const apiError = err as ApiError
+      setError(apiError.message || 'Error al cargar monitorías')
+      console.error('Error loading monitorías:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleAdd = () => {
     setSelectedMonitoria(null)
@@ -372,27 +419,48 @@ export default function MonitoriasGrupalesPage() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm("¿Estás seguro de que deseas eliminar esta monitoría grupal?")) {
-      setMonitorias((prev) => prev.filter((m) => m.id !== id))
+  const handleDelete = async (id: string) => {
+    if (!confirm("¿Estás seguro de que deseas eliminar esta monitoría grupal?")) {
+      return
+    }
+
+    try {
+      await api.deleteMonitoriaGrupal(id)
+      // Recargar la lista
+      await loadMonitorias()
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al eliminar monitoría')
+      console.error('Error deleting monitoría:', err)
     }
   }
 
-  const handleSave = (data: Omit<MonitoriaGrupal, "id" | "monitorId">) => {
-    if (selectedMonitoria) {
-      // Editar
-      setMonitorias((prev) =>
-        prev.map((m) => (m.id === selectedMonitoria.id ? { ...m, ...data } : m))
-      )
-    } else {
-      // Crear nueva
-      const newMonitoria: MonitoriaGrupal = {
-        id: Date.now().toString(),
-        ...data,
-        monitorId: "1", // En el futuro vendrá del contexto de auth
+  const handleSave = async (data: Omit<MonitoriaGrupal, "id" | "monitorId">) => {
+    try {
+      if (selectedMonitoria) {
+        // Editar
+        await api.updateMonitoriaGrupal(selectedMonitoria.id, data)
+      } else {
+        // Crear nueva
+        await api.createMonitoriaGrupal(data)
       }
-      setMonitorias((prev) => [...prev, newMonitoria])
+      // Recargar la lista
+      await loadMonitorias()
+      setIsModalOpen(false)
+      setSelectedMonitoria(null)
+    } catch (err) {
+      const apiError = err as ApiError
+      alert(apiError.message || 'Error al guardar monitoría')
+      console.error('Error saving monitoría:', err)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground">Cargando monitorías...</p>
+      </div>
+    )
   }
 
   return (
@@ -409,6 +477,14 @@ export default function MonitoriasGrupalesPage() {
           Añadir Monitoría Grupal
         </Button>
       </div>
+
+      {error && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-red-500">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {monitorias.length === 0 ? (
         <Card>

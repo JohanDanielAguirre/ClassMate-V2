@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,8 +13,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Calendar } from "@/components/student/Calendar"
-import { mockMonitoriasEstudiante } from "@/data/mockData"
 import { MonitoriaEstudiante } from "@/types"
+import { useAuth } from "@/contexts/AuthContext"
+import { api, ApiError } from "@/lib/api"
 import { Calendar as CalendarIcon, Clock, MapPin, BookOpen, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -211,25 +212,84 @@ function DiaModal({
 }
 
 export default function EstudianteDashboardPage() {
-  const [monitorias, setMonitorias] = useState(mockMonitoriasEstudiante)
+  const { user } = useAuth()
+  const [monitorias, setMonitorias] = useState<MonitoriaEstudiante[]>([])
+  const [proximaMonitoria, setProximaMonitoria] = useState<MonitoriaEstudiante | null>(null)
+  const [monitoriasHoy, setMonitoriasHoy] = useState(0)
   const [selectedMonitoria, setSelectedMonitoria] =
     useState<MonitoriaEstudiante | null>(null)
   const [selectedDay, setSelectedDay] = useState<{
     date: Date
     monitorias: MonitoriaEstudiante[]
   } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Obtener próxima monitoría
-  const hoy = new Date().toISOString().split("T")[0]
-  const proximaMonitoria = monitorias
-    .filter((m) => m.fecha >= hoy)
-    .sort((a, b) => {
-      if (a.fecha !== b.fecha) return a.fecha.localeCompare(b.fecha)
-      return a.horario.localeCompare(b.horario)
-    })[0]
+  // Función para mapear monitoría del backend
+  const mapMonitoriaFromBackend = (data: any): MonitoriaEstudiante => {
+    const hoy = new Date().toISOString().split("T")[0]
+    const now = new Date()
+    const horaActual = now.toTimeString().slice(0, 5)
+    const fechaMonitoria = data.fecha
+    const horarioMonitoria = data.horario
+    const yaPaso = fechaMonitoria < hoy || (fechaMonitoria === hoy && horarioMonitoria < horaActual)
 
-  // Contar monitorías de hoy
-  const monitoriasHoy = monitorias.filter((m) => m.fecha === hoy).length
+    return {
+      id: data._id || data.id,
+      fecha: data.fecha,
+      horario: data.horario,
+      curso: data.curso,
+      espacio: data.espacio,
+      tipo: data.tipo,
+      monitor: data.monitor ? {
+        id: data.monitor.id,
+        name: data.monitor.name,
+      } : { id: data.monitorId, name: "Desconocido" },
+      monitoriaPersonalizadaId: data.monitoriaPersonalizadaId,
+      monitoriaGrupalId: data.monitoriaGrupalId,
+      yaPaso,
+      calificada: false, // Por ahora siempre false, se puede implementar después
+      calificacion: undefined,
+    }
+  }
+
+  // Cargar datos del dashboard
+  useEffect(() => {
+    if (user?.id) {
+      loadDashboardData()
+    }
+  }, [user?.id])
+
+  const loadDashboardData = async () => {
+    if (!user?.id) return
+
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await api.getEstudianteDashboard()
+
+      // Mapear próxima monitoría
+      if (data.proximaMonitoria) {
+        const proxima = mapMonitoriaFromBackend(data.proximaMonitoria)
+        setProximaMonitoria(proxima)
+      } else {
+        setProximaMonitoria(null)
+      }
+
+      // Establecer cantidad de monitorías de hoy
+      setMonitoriasHoy(data.monitoriasHoy || 0)
+
+      // Mapear todas las monitorías confirmadas para el calendario
+      const monitoriasMapped = (data.monitoriasConfirmadas || []).map(mapMonitoriaFromBackend)
+      setMonitorias(monitoriasMapped)
+    } catch (err) {
+      const apiError = err as ApiError
+      setError(apiError.message || 'Error al cargar datos del dashboard')
+      console.error('Error loading dashboard:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleDayClick = (date: Date, dayMonitorias: MonitoriaEstudiante[]) => {
     setSelectedDay({ date, monitorias: dayMonitorias })
@@ -240,10 +300,19 @@ export default function EstudianteDashboardPage() {
   }
 
   const handleRate = (monitoriaId: string, rating: number) => {
+    // TODO: Implementar endpoint para calificar monitoría
     setMonitorias((prev) =>
       prev.map((m) =>
         m.id === monitoriaId ? { ...m, calificacion: rating, calificada: true } : m
       )
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <p className="text-muted-foreground">Cargando dashboard...</p>
+      </div>
     )
   }
 
@@ -253,6 +322,14 @@ export default function EstudianteDashboardPage() {
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Resumen de tus monitorías</p>
       </div>
+
+      {error && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm text-red-500">{error}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 2 Cards superiores */}
       <div className="grid gap-4 md:grid-cols-2">
