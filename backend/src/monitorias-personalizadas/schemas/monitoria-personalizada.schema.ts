@@ -9,4 +9,3 @@ export class MonitoriaPersonalizada extends Document {
   @Prop({ required: true }) monitorId: string;
 }
 export const MonitoriaPersonalizadaSchema = SchemaFactory.createForClass(MonitoriaPersonalizada);
-

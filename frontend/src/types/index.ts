@@ -65,12 +65,12 @@ export interface MonitoriaConfirmada {
 
 export interface DashboardStats {
   monitoriasConfirmadasEstaSemana: number
-  proximaMonitoria?: {
+  proximaMonitoria: {
     fecha: string
     horario: string
     ubicacion: string
     curso: string
-  }
+  } | null
   totalMonitoriasDadas: number
   calificacionMedia: number
 }
@@ -136,3 +136,13 @@ export interface MonitoriaEstudiante {
   calificacion?: number
 }
 
+export interface Rating {
+  id?: string;
+  monitoriaConfirmadaId: string;
+  monitorId: string;
+  estudianteId: string;
+  score: number;
+  comentario?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}

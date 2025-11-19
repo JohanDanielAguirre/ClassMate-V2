@@ -67,6 +67,7 @@ function MonitoriaModal({
   onClose: () => void
   onRate: (monitoriaId: string, rating: number) => void
 }) {
+  const { user } = useAuth();
   const [rating, setRating] = useState(monitoria?.calificacion || 0)
 
   if (!monitoria) return null
@@ -114,7 +115,7 @@ function MonitoriaModal({
               <p className="text-sm">{monitoria.monitor.name}</p>
             </div>
           </div>
-          {monitoria.yaPaso && !monitoria.calificada && (
+          {user?.role === 'Estudiante' && monitoria.yaPaso && !monitoria.calificada && (
             <div className="rounded-lg border p-4">
               <p className="mb-2 text-sm font-medium">Califica esta monitoría</p>
               <StarRating rating={rating} onRatingChange={setRating} />
@@ -123,7 +124,7 @@ function MonitoriaModal({
               </Button>
             </div>
           )}
-          {monitoria.calificada && monitoria.calificacion && (
+          {user?.role === 'Estudiante' && monitoria.calificada && monitoria.calificacion && (
             <div className="rounded-lg border p-4">
               <p className="mb-2 text-sm font-medium">Tu calificación</p>
               <StarRating rating={monitoria.calificacion} readonly />
@@ -227,13 +228,7 @@ export default function EstudianteDashboardPage() {
 
   // Función para mapear monitoría del backend
   const mapMonitoriaFromBackend = (data: any): MonitoriaEstudiante => {
-    const hoy = new Date().toISOString().split("T")[0]
-    const now = new Date()
-    const horaActual = now.toTimeString().slice(0, 5)
-    const fechaMonitoria = data.fecha
-    const horarioMonitoria = data.horario
-    const yaPaso = fechaMonitoria < hoy || (fechaMonitoria === hoy && horarioMonitoria < horaActual)
-
+    const yaPaso = !!data.yaPaso || false;
     return {
       id: data._id || data.id,
       fecha: data.fecha,
@@ -248,8 +243,8 @@ export default function EstudianteDashboardPage() {
       monitoriaPersonalizadaId: data.monitoriaPersonalizadaId,
       monitoriaGrupalId: data.monitoriaGrupalId,
       yaPaso,
-      calificada: false, // Por ahora siempre false, se puede implementar después
-      calificacion: undefined,
+      calificada: !!data.calificada,
+      calificacion: data.calificacion,
     }
   }
 
@@ -299,13 +294,21 @@ export default function EstudianteDashboardPage() {
     setSelectedMonitoria(monitoria)
   }
 
-  const handleRate = (monitoriaId: string, rating: number) => {
-    // TODO: Implementar endpoint para calificar monitoría
-    setMonitorias((prev) =>
-      prev.map((m) =>
-        m.id === monitoriaId ? { ...m, calificacion: rating, calificada: true } : m
+  const handleRate = async (monitoriaId: string, rating: number) => {
+    if (user?.role !== 'Estudiante') return; // seguridad extra en frontend
+    try {
+      await api.rateMonitoria(monitoriaId, rating);
+      setMonitorias((prev) =>
+        prev.map((m) =>
+          m.id === monitoriaId ? { ...m, calificacion: rating, calificada: true } : m
+        )
       )
-    )
+      if (selectedMonitoria?.id === monitoriaId) {
+        setSelectedMonitoria({ ...selectedMonitoria, calificacion: rating, calificada: true })
+      }
+    } catch (err) {
+      console.error('Error enviando calificación', err);
+    }
   }
 
   if (loading) {
@@ -409,4 +412,3 @@ export default function EstudianteDashboardPage() {
     </div>
   )
 }
-

@@ -17,9 +17,10 @@ import {
 } from '@/components/ui/select'
 import { api, ApiError } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
+import { UserRole } from '@/types'
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{email:string; name:string; password:string; university:string; role: '' | UserRole}>({
     email: '',
     name: '',
     password: '',
@@ -34,6 +35,10 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    if (!formData.role) {
+      setError('Selecciona un rol')
+      return
+    }
     setLoading(true)
 
     try {
@@ -42,7 +47,7 @@ export default function RegisterPage() {
         name: formData.name,
         password: formData.password,
         university: formData.university,
-        role: formData.role as 'Monitor' | 'Estudiante',
+        role: formData.role,
       })
       
       // Guardar token
@@ -51,28 +56,30 @@ export default function RegisterPage() {
       // Obtener perfil del usuario
       try {
         const profile = await api.getProfile()
-        // Crear objeto User desde el perfil completo
+        const role: UserRole = profile.role === 'Monitor' ? 'Monitor' : 'Estudiante'
         const user = {
           id: profile._id || profile.id,
           email: profile.email,
           name: profile.name,
-          role: profile.role,
+          role,
           university: profile.university || '',
+          avatar: profile.avatar,
         }
         login(user)
-        router.push(profile.role === 'Monitor' ? '/monitor/dashboard' : '/estudiante/dashboard')
+        router.push(role === 'Monitor' ? '/monitor/dashboard' : '/estudiante/dashboard')
       } catch (profileError) {
         // Si no se puede obtener el perfil, usar datos del formulario como fallback
         console.warn('No se pudo obtener el perfil:', profileError)
+        const fallbackRole: UserRole = formData.role === 'Monitor' ? 'Monitor' : 'Estudiante'
         const user = {
           id: 'temp',
-          email: formData.email,
-          name: formData.name,
-          role: formData.role,
-          university: formData.university,
+            email: formData.email,
+            name: formData.name,
+            role: fallbackRole,
+            university: formData.university,
         }
         login(user)
-        router.push(formData.role === 'Monitor' ? '/monitor/dashboard' : '/estudiante/dashboard')
+        router.push(fallbackRole === 'Monitor' ? '/monitor/dashboard' : '/estudiante/dashboard')
       }
     } catch (err) {
       const apiError = err as ApiError
@@ -208,4 +215,3 @@ export default function RegisterPage() {
     </div>
   )
 }
-

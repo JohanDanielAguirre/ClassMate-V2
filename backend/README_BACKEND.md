@@ -70,9 +70,17 @@ PATCH `/solicitudes/:id/estado` body: {estado:'aceptada'|'rechazada'}
 POST `/monitorias-confirmadas` (token Monitor) body: {fecha,horario,curso,espacio,tipo,[monitoriaPersonalizadaId|monitoriaGrupalId]}
 GET  `/monitorias-confirmadas/monitor/:monitorId`
 GET  `/monitorias-confirmadas/estudiante/:estudianteId`
+POST `/monitorias-confirmadas/grupal/:monitoriaGrupalId/confirmar` (token Estudiante) => confirma asistencia próxima sesión grupal
+
+### Calificaciones (Ratings)
+POST `/ratings` (token Estudiante) body: {monitoriaConfirmadaId, score(1-5)[,comentario]}
+- Solo se puede calificar si el estudiante asistió y la monitoría ya pasó.
+- Recalcula automáticamente el promedio del monitor (`User.calificacionMedia`).
 
 ### Dashboard
 GET `/dashboard/monitor/:monitorId` => { monitoriasConfirmadasEstaSemana, proximaMonitoria, totalMonitoriasDadas, calificacionMedia }
+GET `/dashboard/monitor` (token Monitor) => stats del monitor autenticado
+GET `/dashboard/estudiante` (token Estudiante) => { proximaMonitoria, monitoriasHoy, monitoriasConfirmadas[] } (incluye flags `yaPaso`, `calificada`, `calificacion`)
 
 ## Mapeo con tipos del Frontend
 - User.role => "Monitor" | "Estudiante"
@@ -80,9 +88,10 @@ GET `/dashboard/monitor/:monitorId` => { monitoriasConfirmadasEstaSemana, proxim
 - MonitoriaGrupal.aforoMaximo => number | "ilimitado" (internamente string)
 - Solicitud => estados: pendiente/aceptada/rechazada
 - MonitoriaConfirmada => estudiantes (array {id,name})
+- Rating => colección `ratings` (único por monitoriaConfirmada+estudiante)
 
 ## Próximos pasos sugeridos
-1. Añadir calificaciones (ratings) y endpoint POST rating.
+1. Añadir calificaciones (ratings) y endpoint POST rating. ✅
 2. Validar solapamiento de horarios en monitorías confirmadas.
 3. Paginación y filtros (curso, monitor, fecha).
 4. Seguridad: password hashing ya presente (bcrypt), agregar refresh tokens.
@@ -97,4 +106,7 @@ Crear monitoría grupal (usar token):
 ```bash
 curl -X POST http://localhost:3001/monitorias-grupales -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -d '{"curso":"APO 3","recurrencia":"una-a-la-semana","diasYHorarios":[{"dia":"Jueves","hora":"13:00"}],"aforoMaximo":20}'
 ```
-
+Calificar una monitoría confirmada (token Estudiante) después de que ocurra:
+```bash
+curl -X POST http://localhost:3001/ratings -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -d '{"monitoriaConfirmadaId":"ID_MONITORIA","score":5,"comentario":"Excelente explicación"}'
+```

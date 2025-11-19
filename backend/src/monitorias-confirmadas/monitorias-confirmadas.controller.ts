@@ -27,9 +27,8 @@ export class MonitoriasConfirmadasController {
   @Post('grupal/:monitoriaGrupalId/confirmar')
   async confirmarAsistenciaGrupal(
     @Param('monitoriaGrupalId') monitoriaGrupalId: string,
-    @Req() req: any
+    @Req() req: any,
   ) {
     return this.service.confirmarAsistenciaGrupal(monitoriaGrupalId, req.user.id);
   }
 }
-

@@ -4,13 +4,17 @@ import { Model } from 'mongoose';
 import { MonitoriaConfirmada } from '../monitorias-confirmadas/schemas/monitoria-confirmada.schema';
 import { UsersService } from '../users/users.service';
 import { SolicitudesService } from '../solicitudes/solicitudes.service';
+import { Rating } from '../ratings/schemas/rating.schema';
 
 @Injectable()
 export class DashboardService {
   constructor(
-    @InjectModel(MonitoriaConfirmada.name) private confirmadas: Model<MonitoriaConfirmada>,
+    @InjectModel(MonitoriaConfirmada.name)
+    private confirmadas: Model<MonitoriaConfirmada>,
+    @InjectModel(Rating.name)
+    private ratings: Model<Rating>,
     private usersService: UsersService,
-    private solicitudesService: SolicitudesService
+    private solicitudesService: SolicitudesService,
   ) {}
 
   async monitorStats(monitorId: string) {
@@ -21,32 +25,25 @@ export class DashboardService {
     weekAgo.setDate(now.getDate() - 7);
     const weekAgoStr = weekAgo.toISOString().split('T')[0];
 
-    // Monitorías confirmadas por ocurrir (futuras)
     const monitoriasFuturas = all
-      .filter(m => {
-        // Si la fecha es mayor que hoy, es futura
+      .filter((m) => {
         if (m.fecha > hoy) return true;
-        // Si es hoy, verificar si el horario es futuro
         if (m.fecha === hoy) {
           const horaActual = now.toTimeString().slice(0, 5);
           return m.horario >= horaActual;
         }
         return false;
       })
-      .map(m => m.toObject())
+      .map((m) => m.toObject())
       .sort((a, b) => {
         const fechaCompare = a.fecha.localeCompare(b.fecha);
         return fechaCompare !== 0 ? fechaCompare : a.horario.localeCompare(b.horario);
       });
 
-    // Próxima monitoría (primera futura)
     const proxima = monitoriasFuturas.length > 0 ? monitoriasFuturas[0] : null;
 
-    // Total monitorías pasadas
-    const monitoriasPasadas = all.filter(m => {
-      // Si la fecha es menor que hoy, es pasada
+    const monitoriasPasadas = all.filter((m) => {
       if (m.fecha < hoy) return true;
-      // Si es hoy, verificar si el horario ya pasó
       if (m.fecha === hoy) {
         const horaActual = now.toTimeString().slice(0, 5);
         return m.horario < horaActual;
@@ -54,35 +51,33 @@ export class DashboardService {
       return false;
     }).length;
 
-    // Monitorías confirmadas esta semana
-    const estaSemana = all.filter(m => {
+    const estaSemana = all.filter((m) => {
       return m.fecha >= weekAgoStr && m.fecha <= hoy;
     }).length;
 
-    // Calificación media del monitor
     const user = await this.usersService.findById(monitorId);
     const calificacionMedia = user.calificacionMedia || 0;
 
-    // Solicitudes pendientes
     const solicitudesPendientes = await this.solicitudesService.listPendientesByMonitor(monitorId);
 
-    // Horario de hoy (monitorías del día actual ordenadas por horario)
     const monitoriasHoy = all
-      .filter(m => m.fecha === hoy)
-      .map(m => m.toObject())
+      .filter((m) => m.fecha === hoy)
+      .map((m) => m.toObject())
       .sort((a, b) => a.horario.localeCompare(b.horario));
 
     return {
       monitoriasConfirmadasEstaSemana: estaSemana,
-      proximaMonitoria: proxima ? {
-        fecha: proxima.fecha,
-        horario: proxima.horario,
-        ubicacion: proxima.espacio,
-        curso: proxima.curso,
-      } : null,
+      proximaMonitoria: proxima
+        ? {
+            fecha: proxima.fecha,
+            horario: proxima.horario,
+            ubicacion: proxima.espacio,
+            curso: proxima.curso,
+          }
+        : null,
       totalMonitoriasDadas: monitoriasPasadas,
       calificacionMedia,
-      solicitudesPendientes: solicitudesPendientes.map(s => ({
+      solicitudesPendientes: solicitudesPendientes.map((s) => ({
         _id: s._id,
         id: s._id,
         fecha: s.fecha,
@@ -96,7 +91,7 @@ export class DashboardService {
         monitoriaGrupalId: s.monitoriaGrupalId,
         monitoriaPersonalizadaId: s.monitoriaPersonalizadaId,
       })),
-      horarioHoy: monitoriasHoy.map(m => ({
+      horarioHoy: monitoriasHoy.map((m) => ({
         _id: m._id,
         id: m._id,
         fecha: m.fecha,
@@ -108,7 +103,7 @@ export class DashboardService {
         monitoriaPersonalizadaId: m.monitoriaPersonalizadaId,
         monitoriaGrupalId: m.monitoriaGrupalId,
       })),
-      monitoriasFuturas: monitoriasFuturas.map(m => ({
+      monitoriasFuturas: monitoriasFuturas.map((m) => ({
         _id: m._id,
         id: m._id,
         fecha: m.fecha,
@@ -128,28 +123,37 @@ export class DashboardService {
     const now = new Date();
     const horaActual = now.toTimeString().slice(0, 5);
 
-    // Obtener todas las monitorías confirmadas del estudiante
     const todas = await this.confirmadas.find({ 'estudiantes.id': estudianteId }).exec();
 
-    // Obtener información del monitor para cada monitoría
+    const monitoriaIds = todas.map((m) => m._id.toString());
+    const ratings = await this.ratings
+      .find({ monitoriaConfirmadaId: { $in: monitoriaIds }, estudianteId })
+      .exec();
+    const ratingsMap = new Map(ratings.map((r) => [r.monitoriaConfirmadaId, r]));
+
     const todasConMonitor = await Promise.all(
       todas.map(async (monitoria) => {
         const obj = monitoria.toObject();
         const monitor = await this.usersService.findById(obj.monitorId);
-        
+        const rating = ratingsMap.get(obj._id.toString());
+        const yaPaso = obj.fecha < hoy || (obj.fecha === hoy && obj.horario < horaActual);
         return {
           ...obj,
-          monitor: monitor ? {
-            id: monitor._id.toString(),
-            name: monitor.name,
-          } : null,
+          monitor: monitor
+            ? {
+                id: monitor._id.toString(),
+                name: monitor.name,
+              }
+            : null,
+          yaPaso,
+          calificada: !!rating,
+          calificacion: rating?.score,
         };
-      })
+      }),
     );
 
-    // Filtrar monitorías futuras
     const monitoriasFuturas = todasConMonitor
-      .filter(m => {
+      .filter((m) => {
         if (m.fecha > hoy) return true;
         if (m.fecha === hoy && m.horario >= horaActual) return true;
         return false;
@@ -159,14 +163,11 @@ export class DashboardService {
         return fechaCompare !== 0 ? fechaCompare : a.horario.localeCompare(b.horario);
       });
 
-    // Próxima monitoría (primera futura)
     const proximaMonitoria = monitoriasFuturas.length > 0 ? monitoriasFuturas[0] : null;
 
-    // Monitorías de hoy
-    const monitoriasHoy = todasConMonitor.filter(m => m.fecha === hoy).length;
+    const monitoriasHoy = todasConMonitor.filter((m) => m.fecha === hoy).length;
 
-    // Lista completa de monitorías confirmadas (para el calendario)
-    const monitoriasConfirmadas = todasConMonitor.map(m => ({
+    const monitoriasConfirmadas = todasConMonitor.map((m) => ({
       _id: m._id,
       id: m._id,
       fecha: m.fecha,
@@ -177,24 +178,31 @@ export class DashboardService {
       monitor: m.monitor,
       monitoriaPersonalizadaId: m.monitoriaPersonalizadaId,
       monitoriaGrupalId: m.monitoriaGrupalId,
+      yaPaso: m.yaPaso,
+      calificada: m.calificada,
+      calificacion: m.calificacion,
     }));
 
     return {
-      proximaMonitoria: proximaMonitoria ? {
-        _id: proximaMonitoria._id,
-        id: proximaMonitoria._id,
-        fecha: proximaMonitoria.fecha,
-        horario: proximaMonitoria.horario,
-        curso: proximaMonitoria.curso,
-        espacio: proximaMonitoria.espacio,
-        tipo: proximaMonitoria.tipo,
-        monitor: proximaMonitoria.monitor,
-        monitoriaPersonalizadaId: proximaMonitoria.monitoriaPersonalizadaId,
-        monitoriaGrupalId: proximaMonitoria.monitoriaGrupalId,
-      } : null,
+      proximaMonitoria: proximaMonitoria
+        ? {
+            _id: proximaMonitoria._id,
+            id: proximaMonitoria._id,
+            fecha: proximaMonitoria.fecha,
+            horario: proximaMonitoria.horario,
+            curso: proximaMonitoria.curso,
+            espacio: proximaMonitoria.espacio,
+            tipo: proximaMonitoria.tipo,
+            monitor: proximaMonitoria.monitor,
+            monitoriaPersonalizadaId: proximaMonitoria.monitoriaPersonalizadaId,
+            monitoriaGrupalId: proximaMonitoria.monitoriaGrupalId,
+            yaPaso: proximaMonitoria.yaPaso,
+            calificada: proximaMonitoria.calificada,
+            calificacion: proximaMonitoria.calificacion,
+          }
+        : null,
       monitoriasHoy,
       monitoriasConfirmadas,
     };
   }
 }
-

@@ -11,12 +11,12 @@ export class MonitoriasConfirmadasService {
   constructor(
     @InjectModel(MonitoriaConfirmada.name) private model: Model<MonitoriaConfirmada>,
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(MonitoriaGrupal.name) private grupalModel: Model<MonitoriaGrupal>
+    @InjectModel(MonitoriaGrupal.name) private grupalModel: Model<MonitoriaGrupal>,
   ) {}
 
   async create(dto: CreateMonitoriaConfirmadaDto, monitorId: string) {
     return new this.model({ ...dto, monitorId, estudiantes: [] }).save();
-    }
+  }
 
   async listByMonitor(monitorId: string) {
     return this.model.find({ monitorId }).exec();
@@ -24,23 +24,25 @@ export class MonitoriasConfirmadasService {
 
   async listByEstudiante(estudianteId: string) {
     const monitorias = await this.model.find({ 'estudiantes.id': estudianteId }).exec();
-    
+
     // Obtener información del monitor para cada monitoría
     const monitoriasConMonitor = await Promise.all(
       monitorias.map(async (monitoria) => {
         const obj = monitoria.toObject();
         const monitor = await this.userModel.findById(obj.monitorId).select('name').exec();
-        
+
         return {
           ...obj,
-          monitor: monitor ? {
-            id: monitor._id.toString(),
-            name: monitor.name,
-          } : null,
+          monitor: monitor
+            ? {
+                id: monitor._id.toString(),
+                name: monitor.name,
+              }
+            : null,
         };
-      })
+      }),
     );
-    
+
     return monitoriasConMonitor;
   }
 
@@ -62,13 +64,11 @@ export class MonitoriasConfirmadasService {
     }
 
     // Buscar todas las sesiones confirmadas de esta monitoría grupal
-    const sesionesConfirmadas = await this.model
-      .find({ monitoriaGrupalId, tipo: 'grupal' })
-      .exec();
+    const sesionesConfirmadas = await this.model.find({ monitoriaGrupalId, tipo: 'grupal' }).exec();
 
     // Filtrar sesiones futuras y ordenar
     let sesionesFuturas = sesionesConfirmadas
-      .filter(m => {
+      .filter((m) => {
         if (m.fecha > hoy) return true;
         if (m.fecha === hoy && m.horario >= horaActual) return true;
         return false;
@@ -83,23 +83,26 @@ export class MonitoriasConfirmadasService {
     if (sesionesFuturas.length === 0) {
       proximaSesion = await this.crearProximaSesionGrupal(monitoriaGrupal, hoy, horaActual);
       if (!proximaSesion) {
-        throw new NotFoundException('No se pudo determinar la próxima sesión para esta monitoría grupal');
+        throw new NotFoundException(
+          'No se pudo determinar la próxima sesión para esta monitoría grupal',
+        );
       }
     } else {
       proximaSesion = sesionesFuturas[0];
     }
 
     // Verificar si el estudiante ya está registrado
-    const yaRegistrado = proximaSesion.estudiantes.some(e => e.id === estudianteId);
+    const yaRegistrado = proximaSesion.estudiantes.some((e) => e.id === estudianteId);
     if (yaRegistrado) {
       throw new BadRequestException('Ya estás registrado en esta sesión');
     }
 
     // Verificar aforo
-    const aforoMaximo = monitoriaGrupal.aforoMaximo === 'ilimitado' 
-      ? Infinity 
-      : parseInt(monitoriaGrupal.aforoMaximo, 10);
-    
+    const aforoMaximo =
+      monitoriaGrupal.aforoMaximo === 'ilimitado'
+        ? Infinity
+        : parseInt(monitoriaGrupal.aforoMaximo, 10);
+
     if (proximaSesion.estudiantes.length >= aforoMaximo) {
       throw new BadRequestException('No hay espacio disponible en esta sesión');
     }
@@ -118,7 +121,7 @@ export class MonitoriasConfirmadasService {
   private async crearProximaSesionGrupal(monitoriaGrupal: any, hoy: string, horaActual: string) {
     const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const hoyDate = new Date(hoy);
-    
+
     // Encontrar el próximo día/horario de la monitoría grupal
     let proximaFecha: string | null = null;
     let proximoHorario: string | null = null;
@@ -132,9 +135,7 @@ export class MonitoriasConfirmadasService {
       const fechaStr = fecha.toISOString().split('T')[0];
 
       // Buscar si este día está en los días de la monitoría
-      const diaHorario = monitoriaGrupal.diasYHorarios.find(
-        (dh: any) => dh.dia === nombreDia
-      );
+      const diaHorario = monitoriaGrupal.diasYHorarios.find((dh: any) => dh.dia === nombreDia);
 
       if (diaHorario) {
         // Si es hoy, verificar que el horario sea futuro
@@ -166,4 +167,3 @@ export class MonitoriasConfirmadasService {
     return await nuevaSesion.save();
   }
 }
-

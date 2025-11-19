@@ -25,7 +25,11 @@ export class MonitoriasPersonalizadasController {
 
   @UseGuards(JwtAuthGuard)
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: CreateMonitoriaPersonalizadaDto, @Req() req: any) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: CreateMonitoriaPersonalizadaDto,
+    @Req() req: any,
+  ) {
     return this.service.update(id, dto, req.user.id);
   }
 
@@ -35,4 +39,3 @@ export class MonitoriasPersonalizadasController {
     return this.service.delete(id, req.user.id);
   }
 }
-

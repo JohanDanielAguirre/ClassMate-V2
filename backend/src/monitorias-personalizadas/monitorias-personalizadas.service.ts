@@ -9,7 +9,7 @@ import { User } from '../users/schemas/user.schema';
 export class MonitoriasPersonalizadasService {
   constructor(
     @InjectModel(MonitoriaPersonalizada.name) private model: Model<MonitoriaPersonalizada>,
-    @InjectModel(User.name) private userModel: Model<User>
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
 
   async create(dto: CreateMonitoriaPersonalizadaDto, monitorId: string) {
@@ -18,7 +18,7 @@ export class MonitoriasPersonalizadasService {
 
   async listByMonitor(monitorId: string) {
     const docs = await this.model.find({ monitorId }).exec();
-    return docs.map(d => d.toObject());
+    return docs.map((d) => d.toObject());
   }
 
   async update(id: string, dto: CreateMonitoriaPersonalizadaDto, monitorId: string) {
@@ -52,9 +52,12 @@ export class MonitoriasPersonalizadasService {
     const personalizadasConInfo = await Promise.all(
       todasPersonalizadas.map(async (personalizada) => {
         const obj = personalizada.toObject();
-        
+
         // Obtener información del monitor
-        const monitor = await this.userModel.findById(obj.monitorId).select('name calificacionMedia').exec();
+        const monitor = await this.userModel
+          .findById(obj.monitorId)
+          .select('name calificacionMedia')
+          .exec();
 
         return {
           _id: obj._id,
@@ -64,13 +67,15 @@ export class MonitoriasPersonalizadasService {
           descripcion: obj.descripcion,
           monitorId: obj.monitorId,
           monitoriaPersonalizadaId: obj._id.toString(),
-          monitor: monitor ? {
-            id: monitor._id.toString(),
-            name: monitor.name,
-            calificacion: monitor.calificacionMedia || 0,
-          } : null,
+          monitor: monitor
+            ? {
+                id: monitor._id.toString(),
+                name: monitor.name,
+                calificacion: monitor.calificacionMedia || 0,
+              }
+            : null,
         };
-      })
+      }),
     );
 
     // Ordenar alfabéticamente por curso
@@ -79,4 +84,3 @@ export class MonitoriasPersonalizadasService {
     return personalizadasConInfo;
   }
 }
-

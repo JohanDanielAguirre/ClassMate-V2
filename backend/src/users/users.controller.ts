@@ -25,4 +25,3 @@ export class UsersController {
     return rest;
   }
 }
-

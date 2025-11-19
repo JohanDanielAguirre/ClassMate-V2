@@ -13,15 +13,16 @@ export class MonitoriasGrupalesService {
     @InjectModel(MonitoriaGrupal.name) private model: Model<MonitoriaGrupal>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(MonitoriaConfirmada.name) private confirmadasModel: Model<MonitoriaConfirmada>,
-    @InjectModel(Solicitud.name) private solicitudesModel: Model<Solicitud>
+    @InjectModel(Solicitud.name) private solicitudesModel: Model<Solicitud>,
   ) {}
 
   async create(dto: CreateMonitoriaGrupalDto, monitorId: string) {
-    const aforoString = dto.aforoMaximo === undefined || dto.aforoMaximo === null
-      ? 'ilimitado'
-      : dto.aforoMaximo === 'ilimitado'
+    const aforoString =
+      dto.aforoMaximo === undefined || dto.aforoMaximo === null
         ? 'ilimitado'
-        : String(dto.aforoMaximo);
+        : dto.aforoMaximo === 'ilimitado'
+          ? 'ilimitado'
+          : String(dto.aforoMaximo);
     return new this.model({ ...dto, aforoMaximo: aforoString, monitorId }).save();
   }
 
@@ -31,7 +32,7 @@ export class MonitoriasGrupalesService {
     const horaActual = now.toTimeString().slice(0, 5);
 
     const docs = await this.model.find({ monitorId }).exec();
-    
+
     const grupalesConStats = await Promise.all(
       docs.map(async (d) => {
         const obj = d.toObject();
@@ -48,7 +49,7 @@ export class MonitoriasGrupalesService {
           .exec();
 
         // Filtrar sesiones futuras
-        const sesionesFuturas = sesionesConfirmadas.filter(m => {
+        const sesionesFuturas = sesionesConfirmadas.filter((m) => {
           if (m.fecha > hoy) return true;
           if (m.fecha === hoy && m.horario >= horaActual) return true;
           return false;
@@ -56,18 +57,20 @@ export class MonitoriasGrupalesService {
 
         // Contar estudiantes únicos confirmados en sesiones futuras
         const estudiantesUnicos = new Set<string>();
-        sesionesFuturas.forEach(sesion => {
-          sesion.estudiantes.forEach(est => {
+        sesionesFuturas.forEach((sesion) => {
+          sesion.estudiantes.forEach((est) => {
             estudiantesUnicos.add(est.id);
           });
         });
         const estudiantesConfirmados = estudiantesUnicos.size;
 
         // Contar solicitudes pendientes relacionadas con esta monitoría grupal
-        const interesados = await this.solicitudesModel.countDocuments({
-          monitoriaGrupalId: obj._id.toString(),
-          estado: 'pendiente',
-        }).exec();
+        const interesados = await this.solicitudesModel
+          .countDocuments({
+            monitoriaGrupalId: obj._id.toString(),
+            estado: 'pendiente',
+          })
+          .exec();
 
         return {
           ...obj,
@@ -75,7 +78,7 @@ export class MonitoriasGrupalesService {
           estudiantesConfirmados,
           interesados,
         };
-      })
+      }),
     );
 
     return grupalesConStats;
@@ -89,14 +92,15 @@ export class MonitoriasGrupalesService {
     if (monitoria.monitorId !== monitorId) {
       throw new ForbiddenException('No tienes permiso para editar esta monitoría');
     }
-    
+
     // Convertir aforoMaximo a string
-    const aforoString = dto.aforoMaximo === undefined || dto.aforoMaximo === null
-      ? 'ilimitado'
-      : dto.aforoMaximo === 'ilimitado'
+    const aforoString =
+      dto.aforoMaximo === undefined || dto.aforoMaximo === null
         ? 'ilimitado'
-        : String(dto.aforoMaximo);
-    
+        : dto.aforoMaximo === 'ilimitado'
+          ? 'ilimitado'
+          : String(dto.aforoMaximo);
+
     Object.assign(monitoria, { ...dto, aforoMaximo: aforoString });
     return monitoria.save();
   }
@@ -124,10 +128,13 @@ export class MonitoriasGrupalesService {
     const grupalesConInfo = await Promise.all(
       todasGrupales.map(async (grupal) => {
         const obj = grupal.toObject();
-        
+
         // Obtener información del monitor
-        const monitor = await this.userModel.findById(obj.monitorId).select('name calificacionMedia').exec();
-        
+        const monitor = await this.userModel
+          .findById(obj.monitorId)
+          .select('name calificacionMedia')
+          .exec();
+
         // Convertir aforo
         let aforo: number | 'ilimitado';
         if (obj.aforoMaximo === 'ilimitado') aforo = 'ilimitado';
@@ -143,21 +150,26 @@ export class MonitoriasGrupalesService {
 
         // Filtrar sesiones futuras confirmadas
         const sesionesFuturasConfirmadas = sesionesConfirmadas
-          .filter(m => {
+          .filter((m) => {
             if (m.fecha > hoy) return true;
             if (m.fecha === hoy && m.horario >= horaActual) return true;
             return false;
           })
-          .map(m => m.toObject())
+          .map((m) => m.toObject())
           .sort((a, b) => {
             const fechaCompare = a.fecha.localeCompare(b.fecha);
             return fechaCompare !== 0 ? fechaCompare : a.horario.localeCompare(b.horario);
           });
 
-        const proximaSesionConfirmada = sesionesFuturasConfirmadas.length > 0 ? sesionesFuturasConfirmadas[0] : null;
+        const proximaSesionConfirmada =
+          sesionesFuturasConfirmadas.length > 0 ? sesionesFuturasConfirmadas[0] : null;
 
         // Calcular próxima sesión potencial basada en días/horarios (aunque no esté confirmada)
-        const proximaSesionPotencial = this.calcularProximaSesionPotencial(obj.diasYHorarios, hoy, horaActual);
+        const proximaSesionPotencial = this.calcularProximaSesionPotencial(
+          obj.diasYHorarios,
+          hoy,
+          horaActual,
+        );
 
         return {
           _id: obj._id,
@@ -168,24 +180,30 @@ export class MonitoriasGrupalesService {
           aforoMaximo: aforo,
           monitorId: obj.monitorId,
           monitoriaGrupalId: obj._id.toString(),
-          monitor: monitor ? {
-            id: monitor._id.toString(),
-            name: monitor.name,
-            calificacion: monitor.calificacionMedia || 0,
-          } : null,
-          proximaSesion: proximaSesionConfirmada ? {
-            fecha: proximaSesionConfirmada.fecha,
-            horario: proximaSesionConfirmada.horario,
-            espacio: proximaSesionConfirmada.espacio,
-            estudiantesConfirmados: proximaSesionConfirmada.estudiantes?.length || 0,
-          } : proximaSesionPotencial ? {
-            fecha: proximaSesionPotencial.fecha,
-            horario: proximaSesionPotencial.horario,
-            espacio: 'Por definir',
-            estudiantesConfirmados: 0,
-          } : null,
+          monitor: monitor
+            ? {
+                id: monitor._id.toString(),
+                name: monitor.name,
+                calificacion: monitor.calificacionMedia || 0,
+              }
+            : null,
+          proximaSesion: proximaSesionConfirmada
+            ? {
+                fecha: proximaSesionConfirmada.fecha,
+                horario: proximaSesionConfirmada.horario,
+                espacio: proximaSesionConfirmada.espacio,
+                estudiantesConfirmados: proximaSesionConfirmada.estudiantes?.length || 0,
+              }
+            : proximaSesionPotencial
+              ? {
+                  fecha: proximaSesionPotencial.fecha,
+                  horario: proximaSesionPotencial.horario,
+                  espacio: 'Por definir',
+                  estudiantesConfirmados: 0,
+                }
+              : null,
         };
-      })
+      }),
     );
 
     // Ordenar alfabéticamente por curso
@@ -194,10 +212,14 @@ export class MonitoriasGrupalesService {
     return grupalesConInfo;
   }
 
-  private calcularProximaSesionPotencial(diasYHorarios: { dia: string; hora: string }[], hoy: string, horaActual: string) {
+  private calcularProximaSesionPotencial(
+    diasYHorarios: { dia: string; hora: string }[],
+    hoy: string,
+    horaActual: string,
+  ) {
     const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const hoyDate = new Date(hoy);
-    
+
     // Buscar el próximo día/horario en los próximos 14 días
     for (let i = 0; i < 14; i++) {
       const fecha = new Date(hoyDate);
@@ -207,9 +229,7 @@ export class MonitoriasGrupalesService {
       const fechaStr = fecha.toISOString().split('T')[0];
 
       // Buscar si este día está en los días de la monitoría
-      const diaHorario = diasYHorarios.find(
-        (dh) => dh.dia === nombreDia
-      );
+      const diaHorario = diasYHorarios.find((dh) => dh.dia === nombreDia);
 
       if (diaHorario) {
         // Si es hoy, verificar que el horario sea futuro

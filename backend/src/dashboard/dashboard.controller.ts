@@ -18,4 +18,3 @@ export class DashboardController {
     return this.service.estudianteStats(req.user.id);
   }
 }
-

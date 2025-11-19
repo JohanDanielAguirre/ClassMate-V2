@@ -17,4 +17,3 @@ import { MonitoriasConfirmadasModule } from '../monitorias-confirmadas/monitoria
   controllers: [SeedController],
 })
 export class SeedModule {}
-

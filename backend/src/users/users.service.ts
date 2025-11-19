@@ -38,4 +38,3 @@ export class UsersService {
     return this.userModel.find({ role: 'Monitor' }).select('-passwordHash').exec();
   }
 }
-

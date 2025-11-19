@@ -46,6 +46,11 @@ const estudianteNavItems: NavItem[] = [
     href: "/estudiante/monitorias",
     icon: BookOpen,
   },
+  {
+    title: "Monitorias Confirmadas",
+    href: "/estudiante/monitorias-confirmadas",
+    icon: Users,
+  },
 ]
 
 export function Sidebar() {
@@ -209,4 +214,3 @@ export function Sidebar() {
     </div>
   )
 }
-

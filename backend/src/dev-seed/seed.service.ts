@@ -30,13 +30,38 @@ export class SeedService {
     }
     const existingPers = await this.pers.listByMonitor(monitor.id);
     if (existingPers.length === 0) {
-      await this.pers.create({ curso: 'APO 1', precioPorHora: 25000, descripcion: 'Fundamentos POO.' }, monitor.id);
-      await this.pers.create({ curso: 'Estructuras de Datos', precioPorHora: 30000, descripcion: 'Árboles y grafos.' }, monitor.id);
+      await this.pers.create(
+        { curso: 'APO 1', precioPorHora: 25000, descripcion: 'Fundamentos POO.' },
+        monitor.id,
+      );
+      await this.pers.create(
+        { curso: 'Estructuras de Datos', precioPorHora: 30000, descripcion: 'Árboles y grafos.' },
+        monitor.id,
+      );
     }
     const existingGrup = await this.grup.listByMonitor(monitor.id);
     if (existingGrup.length === 0) {
-      await this.grup.create({ curso: 'APO 3', recurrencia: 'una-a-la-semana', diasYHorarios: [{ dia: 'Jueves', hora: '13:00' }], aforoMaximo: 20 }, monitor.id);
-      await this.grup.create({ curso: 'Base de Datos', recurrencia: 'dos-a-la-semana', diasYHorarios: [{ dia: 'Lunes', hora: '10:00' }, { dia: 'Miércoles', hora: '10:00' }], aforoMaximo: 'ilimitado' }, monitor.id);
+      await this.grup.create(
+        {
+          curso: 'APO 3',
+          recurrencia: 'una-a-la-semana',
+          diasYHorarios: [{ dia: 'Jueves', hora: '13:00' }],
+          aforoMaximo: 20,
+        },
+        monitor.id,
+      );
+      await this.grup.create(
+        {
+          curso: 'Base de Datos',
+          recurrencia: 'dos-a-la-semana',
+          diasYHorarios: [
+            { dia: 'Lunes', hora: '10:00' },
+            { dia: 'Miércoles', hora: '10:00' },
+          ],
+          aforoMaximo: 'ilimitado',
+        },
+        monitor.id,
+      );
     }
     this.logger.log('Seed completado');
     return { ok: true };

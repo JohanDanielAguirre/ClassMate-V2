@@ -32,6 +32,8 @@ services:
       NODE_ENV: development
       MONGODB_URI: mongodb://mongodb:27017/classmate
       PORT: 3001
+      BYPASS_RATING_ATTENDANCE: 'true'
+      BYPASS_RATING_TIME: 'true'
     depends_on:
       mongodb:
         condition: service_healthy

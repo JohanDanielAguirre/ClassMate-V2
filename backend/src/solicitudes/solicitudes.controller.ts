@@ -23,4 +23,3 @@ export class SolicitudesController {
     return this.service.updateEstado(id, body.estado);
   }
 }
-

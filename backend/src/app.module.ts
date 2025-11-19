@@ -10,6 +10,7 @@ import { SolicitudesModule } from './solicitudes/solicitudes.module';
 import { MonitoriasConfirmadasModule } from './monitorias-confirmadas/monitorias-confirmadas.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SeedModule } from './dev-seed/seed.module';
+import { RatingsModule } from './ratings/ratings.module';
 
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/classmate';
 
@@ -24,6 +25,7 @@ const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/classmate
     MonitoriasConfirmadasModule,
     DashboardModule,
     SeedModule,
+    RatingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

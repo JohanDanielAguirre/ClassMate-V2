@@ -35,4 +35,3 @@ export class MonitoriasGrupalesController {
     return this.service.delete(id, req.user.id);
   }
 }
-

@@ -240,7 +240,26 @@ class ApiClient {
       method: 'GET',
     });
   }
+
+  // Ratings
+  async rateMonitoria(monitoriaConfirmadaId: string, score: number, comentario?: string): Promise<any> {
+    return this.request<any>('/ratings', {
+      method: 'POST',
+      body: JSON.stringify({ monitoriaConfirmadaId, score, comentario }),
+    });
+  }
+
+  async getRatingsByMonitor(monitorId: string): Promise<any[]> {
+    return this.request<any[]>(`/ratings/monitor/${monitorId}`, { method: 'GET' });
+  }
+
+  async getRatingsByMonitoria(monitoriaConfirmadaId: string): Promise<any[]> {
+    return this.request<any[]>(`/ratings/monitoria/${monitoriaConfirmadaId}`, { method: 'GET' });
+  }
+
+  async getMyRatingForMonitoria(monitoriaConfirmadaId: string): Promise<any | null> {
+    return this.request<any>(`/ratings/monitoria/${monitoriaConfirmadaId}/mine`, { method: 'GET' });
+  }
 }
 
 export const api = new ApiClient();
-

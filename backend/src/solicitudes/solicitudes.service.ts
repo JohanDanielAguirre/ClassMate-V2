@@ -11,7 +11,7 @@ export class SolicitudesService {
   constructor(
     @InjectModel(Solicitud.name) private model: Model<Solicitud>,
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(MonitoriaConfirmada.name) private confirmadasModel: Model<MonitoriaConfirmada>
+    @InjectModel(MonitoriaConfirmada.name) private confirmadasModel: Model<MonitoriaConfirmada>,
   ) {}
 
   async create(dto: CreateSolicitudDto, estudianteId: string) {
@@ -20,23 +20,28 @@ export class SolicitudesService {
 
   async listPendientesByMonitor(monitorId: string) {
     const solicitudes = await this.model.find({ monitorId, estado: 'pendiente' }).exec();
-    
+
     // Obtener información de los estudiantes
     const solicitudesConEstudiante = await Promise.all(
       solicitudes.map(async (solicitud) => {
         const obj = solicitud.toObject();
-        const estudiante = await this.userModel.findById(obj.estudianteId).select('name email').exec();
+        const estudiante = await this.userModel
+          .findById(obj.estudianteId)
+          .select('name email')
+          .exec();
         return {
           ...obj,
-          estudiante: estudiante ? {
-            id: estudiante._id.toString(),
-            name: estudiante.name,
-            email: estudiante.email,
-          } : null,
+          estudiante: estudiante
+            ? {
+                id: estudiante._id.toString(),
+                name: estudiante.name,
+                email: estudiante.email,
+              }
+            : null,
         };
-      })
+      }),
     );
-    
+
     return solicitudesConEstudiante;
   }
 
@@ -49,21 +54,26 @@ export class SolicitudesService {
     // Si se acepta la solicitud, crear la monitoría confirmada
     if (estado === 'aceptada') {
       // Obtener información del estudiante
-      const estudiante = await this.userModel.findById(solicitud.estudianteId).select('name').exec();
-      
+      const estudiante = await this.userModel
+        .findById(solicitud.estudianteId)
+        .select('name')
+        .exec();
+
       if (!estudiante) {
         throw new NotFoundException('Estudiante no encontrado');
       }
 
       // Verificar si ya existe una monitoría confirmada para esta solicitud
       // (para evitar duplicados si se acepta dos veces)
-      const existeConfirmada = await this.confirmadasModel.findOne({
-        fecha: solicitud.fecha,
-        horario: solicitud.horario,
-        monitorId: solicitud.monitorId,
-        'estudiantes.id': solicitud.estudianteId,
-        tipo: solicitud.tipo,
-      }).exec();
+      const existeConfirmada = await this.confirmadasModel
+        .findOne({
+          fecha: solicitud.fecha,
+          horario: solicitud.horario,
+          monitorId: solicitud.monitorId,
+          'estudiantes.id': solicitud.estudianteId,
+          tipo: solicitud.tipo,
+        })
+        .exec();
 
       if (!existeConfirmada) {
         // Crear la monitoría confirmada
@@ -74,10 +84,12 @@ export class SolicitudesService {
           espacio: solicitud.espacio,
           tipo: solicitud.tipo,
           monitorId: solicitud.monitorId,
-          estudiantes: [{
-            id: solicitud.estudianteId,
-            name: estudiante.name,
-          }],
+          estudiantes: [
+            {
+              id: solicitud.estudianteId,
+              name: estudiante.name,
+            },
+          ],
           monitoriaPersonalizadaId: solicitud.monitoriaPersonalizadaId,
           monitoriaGrupalId: solicitud.monitoriaGrupalId,
         });
@@ -90,4 +102,3 @@ export class SolicitudesService {
     return this.model.findByIdAndUpdate(id, { estado }, { new: true }).exec();
   }
 }
-

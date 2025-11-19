@@ -7,7 +7,10 @@ import { JwtAuthGuard } from './jwt.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService, private usersService: UsersService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {}
 
   @Post('register')
   async register(@Body() dto: CreateUserDto) {
@@ -29,4 +32,3 @@ export class AuthController {
     return userWithoutPassword;
   }
 }
-

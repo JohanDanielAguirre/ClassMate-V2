@@ -4,7 +4,10 @@ import { MonitoriasGrupalesService } from './monitorias-grupales.service';
 import { MonitoriasGrupalesController } from './monitorias-grupales.controller';
 import { MonitoriaGrupal, MonitoriaGrupalSchema } from './schemas/monitoria-grupal.schema';
 import { User, UserSchema } from '../users/schemas/user.schema';
-import { MonitoriaConfirmada, MonitoriaConfirmadaSchema } from '../monitorias-confirmadas/schemas/monitoria-confirmada.schema';
+import {
+  MonitoriaConfirmada,
+  MonitoriaConfirmadaSchema,
+} from '../monitorias-confirmadas/schemas/monitoria-confirmada.schema';
 import { Solicitud, SolicitudSchema } from '../solicitudes/schemas/solicitud.schema';
 
 @Module({
@@ -21,4 +24,3 @@ import { Solicitud, SolicitudSchema } from '../solicitudes/schemas/solicitud.sch
   exports: [MonitoriasGrupalesService],
 })
 export class MonitoriasGrupalesModule {}
-
